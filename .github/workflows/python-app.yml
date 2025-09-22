@@ -1,46 +1,42 @@
-# .github/workflows/ci-deploy.yml
-# Lint, test, then deploy via SSH when pushing to main
+# This workflow will install Python dependencies, run tests and lint with a single version of Python
+# For more information see: https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python
 
 name: Python application
 
 on:
   push:
-    branches: ['main']
+    branches: [ "main" ]
   pull_request:
-    branches: ['main']
+    branches: [ "main" ]
 
 permissions:
   contents: read
 
 jobs:
   build:
+
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Python 3.10
-        uses: actions/setup-python@v3
-        with:
-          python-version: '3.10'
-
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install flake8 pytest
-          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
-
-      - name: Lint with flake8
-        run: |
-          # stop the build if there are Python syntax errors or undefined names
-          flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
-          # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
-          flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
-
-      - name: Test with pytest
-        run: |
-          pytest -q
-
+    - uses: actions/checkout@v4
+    - name: Set up Python 3.10
+      uses: actions/setup-python@v3
+      with:
+        python-version: "3.10"
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install flake8 pytest
+        if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+    - name: Lint with flake8
+      run: |
+        # stop the build if there are Python syntax errors or undefined names
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        # exit-zero treats all errors as warnings. The GitHub editor is 127 chars wide
+        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+    - name: Test with pytest
+      run: |
+        pytest
   deploy:
     runs-on: ubuntu-latest
     needs: build
@@ -50,45 +46,8 @@ jobs:
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      - name: Setup SSH
-        run: |
-          install -m 700 -d ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan -H "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts
-
       - name: Deploy to Production
-        env:
-          HOST: ${{ secrets.SSH_HOST }}
-          USER: ${{ secrets.SSH_USER }}
-          REMOTE_PATH: ${{ secrets.REMOTE_PATH }}
-          SERVICE: ${{ secrets.SYSTEMD_SERVICE }}
-          REPO: https://github.com/${{ github.repository }}.git
         run: |
           echo "Starting Deployment..."
-          ssh -o StrictHostKeyChecking=yes "$USER@$HOST" bash -lc "
-            set -euo pipefail
-
-            # 1) Clone or update the repo
-            if [ ! -d '$REMOTE_PATH/.git' ]; then
-              mkdir -p '$REMOTE_PATH'
-              git clone '$REPO' '$REMOTE_PATH'
-            else
-              cd '$REMOTE_PATH'
-              git fetch --all
-              git reset --hard origin/main
-            fi
-
-            cd '$REMOTE_PATH'
-
-            # 2) Create/activate venv and install deps
-            python3 -m venv venv || true
-            . venv/bin/activate
-            pip install --upgrade pip
-            pip install -r requirements.txt
-
-            # 3) Restart systemd service
-            sudo systemctl daemon-reload || true
-            sudo systemctl restart '$SERVICE'
-            sudo systemctl status '$SERVICE' --no-pager -l || true
-          "
+          # Replace this echo with actual deployment code - for example:
+          # ssh user@my_server "cd/path/to/project && git pull && systemctl restart my-service"

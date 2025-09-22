@@ -1,52 +1,58 @@
-from fastapi import FastAPI, HTTPException
-from pydantic import BaseModel
-from typing import List
+from fastapi.testclient import TestClient
+import sys
+import os
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../src')))
 
-api = FastAPI()
-
-class Ticket(BaseModel):
-    id: int
-    flight_name: str
-    flight_date: str  # Example: "2025-10-15"
-    flight_time: str  # Example: "14:30"
-    destination: str
-
-tickets: List[Ticket] = []
+from main import api
 
 
-@api.get("/")
-def index():
-    return {"Message": "Welcome to the Ticket Booking System"}
+client = TestClient(api)
 
 
-@api.get("/ticket")
-def get_tickets():
-    return tickets
+def test_home():
+    response = client.get("/")
+    assert response.status_code == 200
+    assert response.json() == {"Message": "Welcome to the Ticket Booking System"}
 
 
-@api.post("/ticket")
-def add_ticket(ticket: Ticket):
-    # Check for duplicate ID
-    for t in tickets:
-        if t.id == ticket.id:
-            raise HTTPException(status_code=400, detail="Ticket with this ID already exists")
-    tickets.append(ticket)
-    return ticket
+def test_create_ticket():
+    response = client.post("/ticket", json={
+        "id": 1,
+        "flight_name": "Air Asia",
+        "flight_date": "2025-10-15",
+        "flight_time": "14:30",
+        "destination": "Singapore"
+    })
+    assert response.status_code == 200
+    assert response.json()["flight_name"] == "Air Asia"
 
 
-@api.put("/ticket/{ticket_id}")
-def update_ticket(ticket_id: int, updated_ticket: Ticket):
-    for index, ticket in enumerate(tickets):
-        if ticket.id == ticket_id:
-            tickets[index] = updated_ticket
-            return updated_ticket
-    raise HTTPException(status_code=404, detail="Ticket Not Found")
+def test_get_tickets():
+    response = client.get("/ticket")
+    assert response.status_code == 200
+    assert isinstance(response.json(), list)
+    assert len(response.json()) > 0
 
 
-@api.delete("/ticket/{ticket_id}")
-def delete_ticket(ticket_id: int):
-    for index, ticket in enumerate(tickets):
-        if ticket.id == ticket_id:
-            deleted_ticket = tickets.pop(index)
-            return deleted_ticket
-    raise HTTPException(status_code=404, detail="Ticket not found, deletion failed")
+def test_update_ticket():
+    response = client.put("/ticket/1", json={
+        "id": 1,
+        "flight_name": "Air Asia Updated",
+        "flight_date": "2025-10-16",
+        "flight_time": "15:00",
+        "destination": "Malaysia"
+    })
+    assert response.status_code == 200
+    assert response.json()["flight_name"] == "Air Asia Updated"
+
+
+def test_delete_ticket():
+    response = client.delete("/ticket/1")
+    assert response.status_code == 200
+    assert response.json() == {
+        "id": 1,
+        "flight_name": "Air Asia Updated",
+        "flight_date": "2025-10-16",
+        "flight_time": "15:00",
+        "destination": "Malaysia"
+    }
